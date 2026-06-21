@@ -1,0 +1,28 @@
+# 拍摄设备显示名称映射表
+# 格式: Make|Model|DisplayName
+# 每行一个设备, 按品牌分组
+Apple|iPhone 16 Pro|iPhone 16 Pro
+Apple|iPhone 14|iPhone 14
+Apple|iPad|iPad 4
+Apple|iPad Pro (12.9-inch) (5th generation)|iPad Pro 12.9
+NIKON CORPORATION|NIKON Z 7_2|Nikon Z7 II
+NIKON CORPORATION|NIKON D7200|Nikon D7200
+NIKON CORPORATION|NIKON D5200|Nikon D5200
+NIKON CORPORATION|NIKON Z f|Nikon Z f
+samsung|SM-G9730|Samsung S10
+samsung|SM-G9350|Samsung S7 Edge
+samsung|SM-G9300|Samsung S7
+samsung|Galaxy S24 Ultra|Samsung S24 Ultra
+Xiaomi|MIX 2|Xiaomi MIX 2
+HTC|HTC One_M8|HTC One M8
+HTC|HTC 802d|HTC One M8
+Nokia|Lumia 1020|Nokia Lumia 1020
+FUJIFILM|X-M5|Fujifilm X-M5
+SONY|ILCE-7RM3|Sony A7R III
+SONY|ILCE-7CM2|Sony A7C II
+SONY|ILCE-7M4|Sony A7 IV
+DJI|FC3582|DJI Air 3
+Canon|Canon PowerShot SX610 HS|Canon SX610 HS
+Meizu|MX(040)|Meizu MX4
+Meizu|16th|Meizu 16th
+OPPO|OPPO R9 Plusm A|OPPO R9 Plus

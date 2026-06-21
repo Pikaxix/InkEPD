@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>InkEPD 管理面板</title>
+<style>
+  :root { --bg: #f5f5f0; --card: #fff; --border: #ddd; --text: #222; --muted: #888; --accent: #4a6cf7; --red: #e74c3c; --green: #27ae60; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; background: var(--bg); color: var(--text); padding: 20px; }
+  .container { max-width: 860px; margin: 0 auto; }
+
+  h1 { font-size: 22px; margin-bottom: 4px; }
+  .subtitle { color: var(--muted); font-size: 13px; margin-bottom: 24px; }
+
+  .card { background: var(--card); border-radius: 10px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  .card h2 { font-size: 16px; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .stat { }
+  .stat-label { font-size: 12px; color: var(--muted); }
+  .stat-value { font-size: 18px; font-weight: 600; margin-top: 2px; }
+
+  .tag { display: inline-block; padding: 1px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; }
+  .tag-ok { background: #e8f5e9; color: #2e7d32; }
+  .tag-warn { background: #fff3e0; color: #e65100; }
+
+  label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 4px; }
+  input[type="text"], input[type="number"] { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; }
+  .form-row { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+  .form-row input { flex: 1; }
+  .form-row .btn { flex-shrink: 0; }
+
+  .btn { cursor: pointer; padding: 8px 16px; border: none; border-radius: 6px; font-size: 13px; font-weight: 500; transition: opacity .15s; }
+  .btn:hover { opacity: .85; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .btn-danger { background: var(--red); color: #fff; }
+  .btn:disabled { opacity: .4; cursor: not-allowed; }
+
+  .photo-area { display: flex; gap: 20px; flex-wrap: wrap; }
+  .photo-img { flex: 0 0 240px; }
+  .photo-img img { width: 240px; height: 400px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border); background: #eee; }
+  .photo-img .tabs { display: flex; gap: 4px; margin-top: 6px; }
+  .photo-img .tabs button { flex: 1; font-size: 12px; padding: 4px; }
+  .photo-info { flex: 1; min-width: 200px; font-size: 14px; line-height: 1.7; }
+  .photo-info .label { color: var(--muted); font-size: 12px; }
+  .caption-box { background: #fafaf5; border-radius: 6px; padding: 10px 12px; margin-top: 8px; border-left: 3px solid var(--accent); font-size: 14px; line-height: 1.6; }
+
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #333; color: #fff; padding: 10px 20px; border-radius: 8px; font-size: 14px; opacity: 0; transition: opacity .3s; pointer-events: none; z-index: 999; }
+  .toast.show { opacity: 1; }
+
+  .loading { text-align: center; color: var(--muted); padding: 40px; font-size: 14px; }
+  .error-msg { color: var(--red); font-size: 13px; padding: 10px; }
+  .empty { color: var(--muted); font-size: 14px; padding: 10px 0; }
+
+  @media (max-width: 600px) { .grid2 { grid-template-columns: 1fr; } .photo-area { flex-direction: column; } .photo-img { flex: 0 0 auto; } .photo-img img { width: 100%; height: auto; } }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🖊️ InkEPD 管理面板</h1>
+  <div class="subtitle">V8 · 数据来自服务端 API，操作实时生效</div>
+
+  <!-- ─── 系统状态 ─── -->
+  <div class="card">
+    <h2>🖼️ 当前照片</h2>
+    <div style="margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:8px 18px;font-size:13px;color:var(--muted)">
+      <span>服务器运行: <strong id="s-uptime" style="color:var(--text)">—</strong></span>
+      <span>ESP32: <strong id="s-fw" style="color:var(--text)">—</strong></span>
+      <span>最后通讯: <strong id="s-last" style="color:var(--text)">—</strong></span>
+      <span>状态: <span id="s-health" class="tag">—</span></span>
+      <span>下次唤醒: <strong id="s-next-wake" style="color:var(--text)">—</strong></span>
+    </div>
+    <div id="photo-loading" class="loading">加载中…</div>
+    <div id="photo-content" style="display:none">
+      <div class="photo-area">
+        <div class="photo-img">
+          <img id="photo-img" src="" alt="当前照片">
+          <div class="tabs">
+            <button class="btn btn-outline" data-variant="clean" onclick="switchVariant('clean')">纯图版</button>
+            <button class="btn btn-primary" data-variant="info" onclick="switchVariant('info')">带文版</button>
+          </div>
+        </div>
+        <div class="photo-info">
+          <div><span class="label">文件名</span> <span id="p-filename">—</span></div>
+          <div><span class="label">评分</span> <span id="p-scores">—</span></div>
+          <div><span class="label">日期</span> <span id="p-date">—</span></div>
+          <div><span class="label">地点</span> <span id="p-city">—</span></div>
+          <div><span class="label">设备</span> <span id="p-camera">—</span></div>
+          <div style="margin-top:10px">
+            <div class="label">附言</div>
+            <textarea id="p-caption-input" rows="2" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;resize:vertical;background:#fafaf5"></textarea>
+            <div style="display:flex;gap:6px;margin-top:6px">
+              <button class="btn btn-primary" id="btn-save-caption" onclick="saveCaption()">💾 保存</button>
+              <button class="btn btn-outline" id="btn-regen-caption" onclick="regenCaption()">🔄 重新生成</button>
+            </div>
+            <span id="p-caption-status" style="margin-left:6px;font-size:12px;color:var(--muted)"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="photo-empty" class="empty" style="display:none">暂无缓存照片</div>
+  </div>
+
+  <!-- ─── 刷新设置 ─── -->
+  <div class="card">
+    <h2>⏰ 刷新设置</h2>
+    <div class="form-row">
+      <label style="flex:1">刷新时间 (HH:MM，逗号分隔)
+        <input type="text" id="cfg-refresh" placeholder="08:00,17:00">
+      </label>
+    </div>
+    <div class="form-row">
+      <label style="flex:1">字体
+        <select id="cfg-font" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;background:#fff"></select>
+      </label>
+    </div>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <button class="btn btn-primary" id="btn-save-config">保存设置</button>
+    </div>
+  </div>
+
+  <!-- ─── 数据库 ─── -->
+  <div class="card">
+    <h2>📂 数据库</h2>
+    <div class="grid2" id="stats-grid">
+      <div class="stat"><div class="stat-label">照片总数</div><div class="stat-value" id="st-total">—</div></div>
+      <div class="stat"><div class="stat-label">已评分</div><div class="stat-value" id="st-scored">—</div></div>
+      <div class="stat"><div class="stat-label">待评分</div><div class="stat-value" id="st-pending">—</div></div>
+      <div class="stat"><div class="stat-label">可用 (≥40分)</div><div class="stat-value" id="st-usable">—</div></div>
+      <div class="stat"><div class="stat-label">已有附言</div><div class="stat-value" id="st-captions">—</div></div>
+      <div class="stat"><div class="stat-label">平均回忆度</div><div class="stat-value" id="st-avg-mem">—</div></div>
+      <div class="stat"><div class="stat-label">平均美观度</div><div class="stat-value" id="st-avg-beau">—</div></div>
+    </div>
+
+    <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-primary" id="btn-scan" onclick="startScan()">🔍 扫描新照片</button>
+      <span id="scan-status" style="font-size:13px;color:var(--muted);line-height:32px">就绪</span>
+      <span id="scan-progress" style="font-size:13px;color:var(--muted);line-height:32px;display:none"></span>
+    </div>
+    <div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-outline" id="btn-score" onclick="startScore()">⭐ 评分待处理</button>
+      <button class="btn btn-outline" id="btn-retry" onclick="retryFailed()" style="color:var(--red);border-color:var(--red)">🔄 重试失败</button>
+      <span id="score-status" style="font-size:13px;color:var(--muted);line-height:32px">就绪</span>
+      <span id="score-progress" style="font-size:13px;color:var(--muted);line-height:32px;display:none"></span>
+    </div>
+
+    <div style="margin-top:14px;display:flex;gap:20px;flex-wrap:wrap">
+      <div style="flex:1;min-width:280px">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:4px">回忆度分布</div>
+        <canvas id="chart-mem" height="120" style="width:100%"></canvas>
+      </div>
+      <div style="flex:1;min-width:280px">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:4px">美观度分布</div>
+        <canvas id="chart-beau" height="120" style="width:100%"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── 选图策略 ─── -->
+  <div class="card">
+    <h2>⚙️ 选图策略</h2>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:14px">修改后点击底部「保存策略」持久化，下次刷新生效</p>
+
+    <div id="sel-loading" class="loading">加载参数中…</div>
+    <div id="sel-form" style="display:none">
+      <div class="grid2" style="margin-bottom:12px">
+        <div><label>回忆度权重</label><input type="number" id="sel-mw" step="0.05" min="0" max="1"></div>
+        <div><label>美观度权重</label><input type="number" id="sel-bw" step="0.05" min="0" max="1"></div>
+      </div>
+      <div class="grid2" style="margin-bottom:12px">
+        <div><label>最低分过滤</label><input type="number" id="sel-min" step="1" min="0" max="100"></div>
+        <div><label>首次展示倍率</label><input type="number" id="sel-fs" step="0.1" min="1" max="10"></div>
+      </div>
+
+      <div style="margin-bottom:12px">
+        <div class="label" style="margin-bottom:4px">分档表 (阈值 / 权重 / 冷却天数)</div>
+        <table style="width:100%;border-collapse:collapse;font-size:13px" id="sel-tiers">
+          <thead><tr><th style="text-align:left;padding:4px 8px;border-bottom:1px solid var(--border)">≥ 综合分</th><th style="text-align:left;padding:4px 8px;border-bottom:1px solid var(--border)">权重</th><th style="text-align:left;padding:4px 8px;border-bottom:1px solid var(--border)">冷却(天)</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <div class="grid2" style="margin-bottom:12px">
+        <div><label>冷却最低因子</label><input type="number" id="sel-cdm" step="0.01" min="0" max="1"></div>
+        <div><label>冷却额外上限</label><input type="number" id="sel-cdb" step="0.1" min="0" max="5"></div>
+      </div>
+
+      <div class="grid2" style="margin-bottom:12px">
+        <div><label>历史今天当天倍率</label><input type="number" id="sel-tde" step="0.1" min="0" max="20"></div>
+        <div><label>历史今天附近倍率</label><input type="number" id="sel-tdn" step="0.1" min="0" max="20"></div>
+      </div>
+      <div class="grid2" style="margin-bottom:12px">
+        <div><label>历史今天附近天数</label><input type="number" id="sel-tnd" step="1" min="0" max="14"></div>
+        <div><label>历史今天最低综合分</label><input type="number" id="sel-tmc" step="1" min="0" max="100"></div>
+      </div>
+
+      <button class="btn btn-primary" id="btn-save-sel">💾 保存策略</button>
+      <span id="sel-status" style="margin-left:10px;font-size:13px;color:var(--muted)"></span>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API_BASE = '';
+
+// ─── 工具 ───
+function $(id) { return document.getElementById(id); }
+function showToast(msg) { const t=$('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2500); }
+
+function fmtDuration(sec) {
+  if (!sec && sec !== 0) return '—';
+  const d = Math.floor(sec/86400), h = Math.floor((sec%86400)/3600), m = Math.floor((sec%3600)/60);
+  let r = '';
+  if (d>0) r += `${d}天`;
+  if (h>0 || d>0) r += `${h}小时`;
+  r += `${m}分钟`;
+  return r;
+}
+
+function fmtTimeAgo(sec) {
+  if (!sec && sec !== 0) return '—';
+  if (sec < 60) return '刚刚';
+  if (sec < 3600) return `${Math.floor(sec/60)}分钟前`;
+  if (sec < 86400) return `${Math.floor(sec/3600)}小时前`;
+  return `${Math.floor(sec/86400)}天前`;
+}
+
+// ─── 加载系统状态 ───
+async function loadStatus() {
+  try {
+    const r = await fetch('/api/status');
+    const d = await r.json();
+    $('s-uptime').textContent = fmtDuration(d.uptime_sec);
+    $('s-fw').textContent = d.esp32_version || '—';
+    $('s-last').textContent = fmtTimeAgo(d.last_contact_sec);
+    $('s-next-wake').textContent = fmtDuration(d.next_wake_sec);
+    const ok = d.esp32_alive;
+    $('s-health').textContent = ok ? '✅ 正常' : '⚠️ 离线';
+    $('s-health').className = 'tag ' + (ok ? 'tag-ok' : 'tag-warn');
+  } catch(e) { console.error('status:', e); }
+}
+
+// ─── 加载配置 + 字体列表 ───
+async function loadConfig() {
+  try {
+    const r = await fetch('/api/config');
+    const d = await r.json();
+    $('cfg-refresh').value = d.refresh_times || '';
+  } catch(e) { console.error('config:', e); }
+  try {
+    const r = await fetch('/api/fonts');
+    const d = await r.json();
+    const sel = $('cfg-font');
+    sel.innerHTML = '';
+    for (const f of d.fonts) {
+      const opt = document.createElement('option');
+      opt.value = f.name;
+      opt.textContent = f.name.replace(/\.(ttf|ttc|otf)$/i, '');
+      if (f.name === d.active) opt.selected = true;
+      sel.appendChild(opt);
+    }
+  } catch(e) { console.error('fonts:', e); }
+}
+
+// ─── 保存配置 ───
+$('btn-save-config').onclick = async function() {
+  const val = $('cfg-refresh').value.trim();
+  if (!val) { showToast('请输入刷新时间'); return; }
+  const font = $('cfg-font').value;
+  this.disabled = true; this.textContent = '保存中…';
+  try {
+    const r = await fetch('/api/config', {
+      method: 'PUT',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({REFRESH_TIMES: val, ACTIVE_FONT: font})
+    });
+    const d = await r.json();
+    if (d.ok) { showToast('✅ 设置已保存'); loadStatus(); }
+    else showToast('❌ ' + (d.error||'失败'));
+  } catch(e) { showToast('❌ 请求失败'); }
+  this.disabled = false; this.textContent = '保存设置';
+};
+
+// ─── 加载当前照片 ───
+let currentVariant = 'info';
+async function loadPhoto() {
+  try {
+    const r = await fetch('/api/current-photo');
+    if (r.status === 404) {
+      $('photo-loading').style.display = 'none';
+      $('photo-empty').style.display = 'block';
+      return;
+    }
+    const d = await r.json();
+    $('photo-loading').style.display = 'none';
+    $('photo-content').style.display = 'block';
+
+    $('p-filename').textContent = d.filename || '—';
+    $('p-scores').textContent = `回忆: ${d.mem ?? '?'}  美观: ${d.beau ?? '?'}`;
+    $('p-date').textContent = d.date || '—';
+    $('p-city').textContent = d.city || '—';
+    $('p-camera').textContent = d.camera || '—';
+    $('p-caption-input').value = d.side_caption || '';
+    $('p-caption-status').textContent = '';
+
+    // 加载图片
+    switchVariant(currentVariant);
+  } catch(e) {
+    $('photo-loading').textContent = '加载失败';
+    console.error('photo:', e);
+  }
+}
+
+function switchVariant(v) {
+  currentVariant = v;
+  const img = $('photo-img');
+  img.src = '/api/current-photo/image?variant=' + v + '&t=' + Date.now();
+  // 切换 tab 高亮
+  document.querySelectorAll('.photo-img .tabs button').forEach(b => {
+    b.className = 'btn ' + (b.dataset.variant === v ? 'btn-primary' : 'btn-outline');
+  });
+}
+
+// ─── 保存 / 重新生成附言 ───
+async function regenCaption() {
+  const btn = $('btn-regen-caption');
+  btn.disabled = true; btn.textContent = '生成中…';
+  try {
+    const r = await fetch('/api/current-photo/caption', {method:'POST'});
+    const d = await r.json();
+    if (d.ok) {
+      // 重新拉取最新数据确保文本框同步
+      const r2 = await fetch('/api/current-photo');
+      const d2 = await r2.json();
+      $('p-caption-input').value = d2.side_caption || '';
+      $('p-caption-status').textContent = '已生成 ' + new Date().toLocaleTimeString();
+      showToast('✅ 附言已更新，下次刷新生效');
+    } else {
+      showToast('❌ ' + (d.error||'生成失败'));
+    }
+  } catch(e) { showToast('❌ 请求失败: ' + e.message); }
+  btn.disabled = false; btn.textContent = '🔄 重新生成';
+}
+
+async function saveCaption() {
+  const text = $('p-caption-input').value.trim();
+  if (!text) { showToast('❌ 附言不能为空'); return; }
+  const btn = $('btn-save-caption');
+  btn.disabled = true; btn.textContent = '保存中…';
+  try {
+    const r = await fetch('/api/current-photo/caption', {
+      method:'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({text}),
+    });
+    const d = await r.json();
+    if (d.ok) {
+      $('p-caption-status').textContent = '已保存 ' + new Date().toLocaleTimeString();
+      showToast('✅ 附言已保存，下次刷新生效');
+    } else {
+      showToast('❌ ' + (d.error||'保存失败'));
+    }
+  } catch(e) { showToast('❌ 请求失败'); }
+  btn.disabled = false; btn.textContent = '💾 保存';
+}
+
+// ─── 加载数据库统计 ───
+async function loadStats() {
+  try {
+    const r = await fetch('/api/stats');
+    const d = await r.json();
+    $('st-total').textContent = d.total ?? '—';
+    $('st-scored').textContent = d.scored ?? '—';
+    $('st-pending').textContent = d.pending_score ?? '—';
+    $('st-usable').textContent = d.usable ?? '—';
+    $('st-captions').textContent = d.caption_ready ?? '—';
+    $('st-avg-mem').textContent = d.avg_memory ?? '—';
+    $('st-avg-beau').textContent = d.avg_beauty ?? '—';
+    if (d.memory_dist) drawDistChart('chart-mem', d.memory_dist, '#4a6cf7');
+    if (d.beauty_dist) drawDistChart('chart-beau', d.beauty_dist, '#27ae60');
+  } catch(e) { console.error('stats:', e); }
+}
+
+function drawDistChart(canvasId, dist, color) {
+  const canvas = $(canvasId);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const rect = canvas.parentElement.getBoundingClientRect();
+  const W = Math.max(rect.width - 4, 200);
+  const H = 120;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  ctx.scale(dpr, dpr);
+
+  // 10 buckets: "0", "10", ..., "90"
+  const buckets = [];
+  let maxVal = 1;
+  for (let i = 0; i <= 90; i += 10) {
+    const k = '' + i;
+    const v = dist[k] || 0;
+    buckets.push({ label: i, val: v });
+    if (v > maxVal) maxVal = v;
+  }
+
+  const pad = { top: 6, bottom: 18, left: 30, right: 10 };
+  const cw = W - pad.left - pad.right;
+  const ch = H - pad.top - pad.bottom;
+  const bw = cw / buckets.length;
+
+  ctx.clearRect(0, 0, W, H);
+
+  // Y 轴刻度 (0, maxVal 取整)
+  const yMax = Math.ceil(maxVal / 10) * 10 || 10;
+  for (let y = 0; y <= yMax; y += Math.ceil(yMax / 4 / 10) * 10 || yMax) {
+    if (y === 0) continue;
+    const yy = pad.top + ch - (y / yMax) * ch;
+    ctx.strokeStyle = '#eee';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(pad.left, yy); ctx.lineTo(W - pad.right, yy); ctx.stroke();
+    ctx.fillStyle = '#999';
+    ctx.font = '9px sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText('' + y, pad.left - 4, yy + 3);
+  }
+
+  // 画柱
+  for (let i = 0; i < buckets.length; i++) {
+    const x = pad.left + i * bw + bw * 0.1;
+    const w = bw * 0.8;
+    const h = (buckets[i].val / yMax) * ch;
+    const y = pad.top + ch - h;
+
+    // 柱体
+    ctx.fillStyle = color;
+    ctx.globalAlpha = 0.7;
+    ctx.fillRect(x, y, w, h);
+    ctx.globalAlpha = 1;
+
+    // 值 (在柱上方或柱内)
+    if (h > 14) {
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 9px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(buckets[i].val, x + w / 2, y + 11);
+    } else {
+      ctx.fillStyle = '#666';
+      ctx.font = '9px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(buckets[i].val, x + w / 2, y - 3);
+    }
+
+    // X 轴标签
+    ctx.fillStyle = '#999';
+    ctx.font = '9px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(buckets[i].label, x + w / 2, H - pad.bottom + 12);
+  }
+}
+
+// ─── 选图策略 ───
+async function loadSelParams() {
+  try {
+    const r = await fetch('/api/selection-params');
+    const d = await r.json();
+    $('sel-loading').style.display = 'none';
+    $('sel-form').style.display = 'block';
+
+    $('sel-mw').value = d.memory_weight;
+    $('sel-bw').value = d.beauty_weight;
+    $('sel-min').value = d.min_score;
+    $('sel-fs').value = d.first_show_multiplier;
+    $('sel-cdm').value = d.cooldown_min_factor;
+    $('sel-cdb').value = d.cooldown_bonus_cap;
+    $('sel-tde').value = d.today_exact_multiplier;
+    $('sel-tdn').value = d.today_near_multiplier;
+    $('sel-tnd').value = d.today_near_days;
+    $('sel-tmc').value = d.today_min_comp;
+
+    // 分档表
+    const tbody = $('sel-tiers').querySelector('tbody');
+    tbody.innerHTML = '';
+    for (const t of d.tiers) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td style="padding:4px 8px"><input type="number" class="t-min" value="${t.min}" step="1" min="0" max="100" style="width:70px;padding:4px;border:1px solid var(--border);border-radius:4px"></td>
+        <td style="padding:4px 8px"><input type="number" class="t-w" value="${t.weight}" step="1" min="1" max="20" style="width:60px;padding:4px;border:1px solid var(--border);border-radius:4px"></td>
+        <td style="padding:4px 8px"><input type="number" class="t-c" value="${t.cooldown_days}" step="1" min="1" max="365" style="width:60px;padding:4px;border:1px solid var(--border);border-radius:4px"></td>
+      `;
+      tbody.appendChild(tr);
+    }
+  } catch(e) {
+    $('sel-loading').textContent = '加载失败';
+    console.error('sel:', e);
+  }
+}
+
+$('btn-save-sel').onclick = async function() {
+  const tiers = [];
+  document.querySelectorAll('#sel-tiers tbody tr').forEach(tr => {
+    const inputs = tr.querySelectorAll('input');
+    tiers.push({
+      min: parseFloat(inputs[0].value),
+      weight: parseFloat(inputs[1].value),
+      cooldown_days: parseFloat(inputs[2].value),
+    });
+  });
+
+  const params = {
+    memory_weight: parseFloat($('sel-mw').value),
+    beauty_weight: parseFloat($('sel-bw').value),
+    min_score: parseFloat($('sel-min').value),
+    tiers,
+    cooldown_min_factor: parseFloat($('sel-cdm').value),
+    cooldown_bonus_cap: parseFloat($('sel-cdb').value),
+    today_exact_multiplier: parseFloat($('sel-tde').value),
+    today_near_multiplier: parseFloat($('sel-tdn').value),
+    today_near_days: parseFloat($('sel-tnd').value),
+    today_min_comp: parseFloat($('sel-tmc').value),
+    first_show_multiplier: parseFloat($('sel-fs').value),
+  };
+
+  const btn = this; btn.disabled = true; btn.textContent = '保存中…';
+  try {
+    const r = await fetch('/api/selection-params', {
+      method: 'PUT',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(params),
+    });
+    const d = await r.json();
+    if (d.ok) { showToast('✅ 策略已保存'); $('sel-status').textContent = '已保存 ' + new Date().toLocaleTimeString(); }
+    else showToast('❌ ' + (d.error||'失败'));
+  } catch(e) { showToast('❌ 请求失败'); }
+  btn.disabled = false; btn.textContent = '💾 保存策略';
+};
+
+// ─── 定时刷新状态 ───
+let autoTimer;
+
+// ─── 扫描新文件 (不入库) ───
+let scanTimer;
+async function startScan() {
+  const btn = $('btn-scan');
+  btn.disabled = true; btn.textContent = '扫描中…';
+  $('scan-status').textContent = '启动中…';
+  try {
+    const r = await fetch('/api/scan', {method:'POST'});
+    const d = await r.json();
+    if (!d.ok) { showToast('❌ ' + (d.error||'失败')); btn.disabled = false; btn.textContent = '🔍 扫描新照片'; return; }
+    showToast('✅ 扫描已开始');
+    pollScan();
+  } catch(e) { showToast('❌ 请求失败'); btn.disabled = false; btn.textContent = '🔍 扫描新照片'; }
+}
+function pollScan() {
+  if (scanTimer) clearInterval(scanTimer);
+  scanTimer = setInterval(async () => {
+    try {
+      const r = await fetch('/api/scan/status');
+      const d = await r.json();
+      const btn = $('btn-scan');
+      if (d.running) {
+        btn.disabled = true; btn.textContent = '扫描中…';
+        $('scan-status').textContent = '扫描: ' + (d.current || '...');
+        $('scan-progress').style.display = 'inline';
+        $('scan-progress').textContent = d.done + '/' + d.total;
+      } else {
+        clearInterval(scanTimer); scanTimer = null;
+        btn.disabled = false; btn.textContent = '🔍 扫描新照片';
+        if (d.error) { $('scan-status').textContent = '❌ ' + d.error; }
+        else if (d.total > 0) { $('scan-status').textContent = '✅ 发现 ' + d.done + ' 张新照片 (待评分)'; loadStats(); }
+        else { $('scan-status').textContent = '就绪'; }
+        $('scan-progress').style.display = 'none';
+      }
+    } catch(e) {}
+  }, 2000);
+}
+
+// ─── VLM 评分 ───
+let scoreTimer;
+async function startScore() {
+  const btn = $('btn-score');
+  btn.disabled = true; btn.textContent = '评分中…';
+  $('score-status').textContent = '启动中…';
+  try {
+    const r = await fetch('/api/score', {method:'POST'});
+    const d = await r.json();
+    if (!d.ok) { showToast('❌ ' + (d.error||'失败')); btn.disabled = false; btn.textContent = '⭐ 评分待处理'; return; }
+    showToast('✅ 评分已开始');
+    pollScore();
+  } catch(e) { showToast('❌ 请求失败'); btn.disabled = false; btn.textContent = '⭐ 评分待处理'; }
+}
+function pollScore() {
+  if (scoreTimer) clearInterval(scoreTimer);
+  scoreTimer = setInterval(async () => {
+    try {
+      const r = await fetch('/api/score/status');
+      const d = await r.json();
+      const btn = $('btn-score');
+      if (d.running) {
+        btn.disabled = true; btn.textContent = '评分中…';
+        $('score-status').textContent = '评分: ' + (d.current || '...');
+        $('score-progress').style.display = 'inline';
+        $('score-progress').textContent = d.done + '/' + d.total;
+      } else {
+        clearInterval(scoreTimer); scoreTimer = null;
+        btn.disabled = false; btn.textContent = '⭐ 评分待处理';
+        if (d.error) { $('score-status').textContent = '❌ ' + d.error; }
+        else if (d.total > 0) { $('score-status').textContent = '✅ 完成: 评了 ' + d.done + ' 张'; loadStats(); }
+        else { $('score-status').textContent = '就绪'; }
+        $('score-progress').style.display = 'none';
+      }
+    } catch(e) {}
+  }, 2000);
+}
+
+async function retryFailed() {
+  const btn = $('btn-retry');
+  btn.disabled = true; btn.textContent = '重试中…';
+  try {
+    const r = await fetch('/api/score/retry-failed', {method:'POST'});
+    const d = await r.json();
+    if (d.ok) { showToast('✅ ' + d.message); }
+    else { showToast('❌ ' + (d.error||'失败')); }
+  } catch(e) { showToast('❌ 请求失败'); }
+  btn.disabled = false; btn.textContent = '🔄 重试失败';
+  // 轮询状态等完成
+  pollScore();
+}
+
+function startAutoRefresh() {
+  autoTimer = setInterval(() => {
+    loadStatus();
+    // 照片和统计不是高频数据，不自动刷新
+  }, 15000);  // 每15秒刷新状态
+}
+
+// ─── 启动 ───
+async function init() {
+  await Promise.all([loadStatus(), loadConfig(), loadPhoto(), loadStats(), loadSelParams()]);
+  startAutoRefresh();
+}
+init();
+</script>
+</body>
+</html>

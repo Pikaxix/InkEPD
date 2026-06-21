@@ -1,0 +1,9 @@
+# ESP32-C3 4MB Flash — OTA 双分区 + SPIFFS
+# ota_0/ota_1 各 1.5MB，SPIFFS ~960KB
+# 使用：Arduino IDE → Tools → Partition Scheme → Custom → 选择此文件
+
+nvs,      data, nvs,     0x9000,  0x5000,
+otadata,  data, ota,     0xe000,  0x2000,
+ota_0,    app,  ota_0,   0x10000, 0x180000,
+ota_1,    app,  ota_1,   0x190000,0x180000,
+spiffs,   data, spiffs,  0x310000,0xF0000,

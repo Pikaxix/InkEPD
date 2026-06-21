@@ -1,0 +1,50 @@
+# 配置文件 (包含 API Key)
+config.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build*/
+build/
+*.egg
+.venv/
+venv/
+
+# 数据库
+*.db
+
+# 运行时缓存
+data/clean.fb
+data/info.fb
+data/meta.json
+
+# 日志
+log/
+*.log
+
+# 部署目录
+InkEPD/
+*.db-shm
+*.db-wal
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 输出文件
+output/
+*.log
+
+# 固件
+firmware/*.bin
+firmware/_archive/
+
+# 系统文件
+.DS_Store
+Thumbs.db

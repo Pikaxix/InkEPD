@@ -1,7 +1,7 @@
 /**
- * InkEPD v8 — ESP32-C3 拉模型固件
+ * InkEPD — ESP32-C3 拉模型固件
  *
- * 基于 v7 稳定版，继承：定时唤醒 → WiFi → POST /ink/refresh → 收图 → 刷屏 → 睡
+ * 定时唤醒 → WiFi → POST /ink/refresh → 收图 → 刷屏 → 睡
  * 触摸唤醒 → 短按切换信息栏 / 长按10s联网刷新
  *
  * 接线: GPIO5→MOSI  GPIO6→SCLK  GPIO7→CS  GPIO10→DC

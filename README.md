@@ -31,7 +31,7 @@
 |------|------|
 | 相框实拍 | ![相框实拍](docs/images/frame.jpg) |
 | 管理面板 | ![管理面板](docs/images/admin.png) |
-| 选图策略设置 | ![选图策略](docs/images/selection.png) |
+| 选图策略设置 | ![选图策略](docs/images/selection.jpg) |
 
 ---
 
